@@ -10,7 +10,8 @@
     "merchant": "tsx src/merchant.ts",
     "lootboxes": "tsx src/lootboxes.ts",
     "staking": "tsx src/staking.ts",
-    "sabotage-arena": "tsx src/sabotage_arena.ts"
+    "sabotage-arena": "tsx src/sabotage_arena.ts",
+    "farm": "tsx src/farm.ts"
   },
   "dependencies": {
     "@mysten/sui": "^2.3.0",

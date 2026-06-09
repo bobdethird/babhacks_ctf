@@ -97,3 +97,67 @@ be evaluated lagged, inside the full backtest.
 
 Data inputs (`data/daily_log.csv` etc.) are the user-provided Auto_8 logs;
 fed funds rates are recovered from the log's own cash accrual.
+
+---
+
+# Phase 2: New decision methods + overfitting audit
+
+Protocol: all development on 1985–2009 (half A); 2010–2026 (half B) held
+out. Identical execution mechanics for every candidate (close execution,
+same cash accounting, fed funds recovered from logs, borrow spread on
+leverage). Candidates that fail in-sample never touch the held-out half.
+
+## New structural families tested — all rejected in-sample
+
+| Method | Best IS Calmar | Auto_8 IS Calmar |
+|---|---|---|
+| H1 Fractional Kelly (mu_hat/sigma_hat^2, multi-horizon EWM drift) | 0.23 | 0.753 |
+| H2 Vol-managed trend (MA gate x (sigma*/sigma_hat)^k) | 0.33 | 0.753 |
+| H3 CTA trend breadth, vol-scaled | 0.47 | 0.753 |
+| H4 Smooth 2-surface (trend strength x continuous calm gate) | 0.46 | 0.753 |
+| Hyper-ensemble (uniform average of all 1296 family tunings) | 0.676 (A) / 0.903 (B) | 0.753 (A) / 1.022 (B) |
+
+Continuous sizing rules lose by a factor of ~2 on Calmar. The binary
+calm-trend gates encode a real, sharp regime feature of NDX that smooth
+estimators dilute. The gate-ensemble family is genuinely the right tool
+for this data, not just a tuned artifact.
+
+## Overfitting audit of the Auto_8/Auto_9 family (1,296-point grid, 2-fold)
+
+Grid over bull_ma x bull_mom x blend bounds x riskon_rv x def_frac x lev,
+every point evaluated independently on both halves:
+
+- **Fine-tuning does not transfer.** Spearman rank correlation of Calmar
+  across halves: **0.21**. The top-20 sets tuned on half A average 0.881
+  Calmar on half B — indistinguishable from the grid mean (0.873).
+  Any further parameter tweaking of this family should be presumed noise.
+- **The structure is the alpha.** A typical (untuned) family member earns
+  CAGR 30–45% / Calmar 0.6–1.0 on either half.
+- **Canonical params are top-decile on both halves** (94th pctile A, 86th
+  pctile B) — better than half-tuned alternatives transfer. The family is
+  at its limit; the user's read is correct.
+- **Auto_9 ingredients:** the risk-on leverage CAGR gain replicates on
+  both halves (+1.0 to +2.4pp), but max-DD-neutrality was full-sample
+  luck — on 2010–2026 alone DD is ~2.6pp worse with lev 1.3. Treat it as
+  honest leverage in high-quality states, not a free lunch.
+  def_frac >= 0.5 is flat-to-positive on both halves independently.
+
+## Honest forward expectations
+
+2010–2026 was an easy regime (everything scores Calmar ~1 there). The
+full-sample headline (39–41% CAGR, -47% max DD) carries unknown selection
+bias from eight generations of tuning; the two-half consistency suggests
+the core edge is real, but a forward-looking estimate closer to the
+family-typical range (CAGR low/mid-30s, max DD -45 to -55%) is the
+defensible planning number.
+
+## Where significant improvement can still come from
+
+Not from new math on the same two price series — that channel is
+exhausted (Phases 1 and 2 tested ~80 variants and 5 structural families).
+The remaining levers all require new data: cross-asset defensive sleeve
+for the cash leg (bond/gold trend), breadth/credit/VIX-term-structure
+regime inputs, or overnight/intraday return decomposition.
+
+Artifacts: `research_v2.py` (hypothesis framework), `overfit_audit.py`
+(2-fold grid audit), `data/overfit_audit_grid.csv` (all 1,296 results).

@@ -161,3 +161,71 @@ regime inputs, or overnight/intraday return decomposition.
 
 Artifacts: `research_v2.py` (hypothesis framework), `overfit_audit.py`
 (2-fold grid audit), `data/overfit_audit_grid.csv` (all 1,296 results).
+
+---
+
+# Phase 3: External data (gold, VIX, Treasuries)
+
+Network access was proxy-restricted; usable sources were GitHub-hosted
+open datasets. Completeness audit before use:
+
+| Series | Coverage | Verdict |
+|---|---|---|
+| LBMA gold PM fix, daily | 1968 – 2026-02 | used in tests (tail forced flat) |
+| VIX close, daily | 1990 – 2026-06 | used with strict missing=off |
+| FRED 10y CMT yield, monthly | 1953 – 2026-04 | **used in final** |
+| Daily treasury curve (data-ust) | 1990 – 2022-03 | rejected (incomplete); used only to validate bond synthesis |
+
+Protocol unchanged: hypotheses developed/selected on 1985–2009 only;
+one frozen evaluation on 2010–2026. All runs include 5bp one-way
+transaction costs.
+
+## Rejected in-sample (never touched OOS)
+
+- **G1 gold sleeve** (trend + funding-hurdle filtered gold on the cash
+  leg): −0.4 to −3.5pp CAGR across all 12 configs. Gold's 1985–2001
+  secular bear loses to the 5–8% cash it displaces even when filtered.
+- **G3 VIX-extended risk-on** (let VIX stand in for missing VXN
+  1990–2001): −3 to −4pp CAGR, max DD −52% to −59%. Forcing the override
+  in mid-90s low-VIX windows deepens the 1997–98 whipsaw episode. The
+  canonical "missing VXN ⇒ no override" quirk is protective; keep it.
+
+## Validated: Auto_10 — 10y Treasury sleeve on the cash leg
+
+Idle cash (1−A) goes into a 10y Treasury proxy when bond 12-month total
+return exceeds the fed-funds 12-month return (monthly signal, 1-month
+lag). Bond TR synthesized from the complete monthly yield series
+(validated 0.997 correlation vs an independent daily-curve
+reconstruction, 1990–2022).
+
+| Strategy (5bp costs) | CAGR | Max DD | Calmar | Sharpe |
+|---|---|---|---|---|
+| Auto_8 | 38.71% | -47.52% | 0.815 | 0.971 |
+| **Auto_10** (Auto_8 + bond sleeve, no margin) | **39.98%** | **-45.58%** | **0.877** | 0.990 |
+| Auto_9 (levered core) | 40.16% | -47.62% | 0.843 | 0.966 |
+| **Auto_10L** (Auto_9 + bond sleeve) | **41.47%** | -47.33% | 0.876 | 0.985 |
+
+Evidence quality — the strongest of any change tested in this project:
+
+- IS (param selection): +1.25pp CAGR, −1.9pp max DD, monotone in both
+  parameters (12m > 6m lookback, full > half fraction) — plateau, not spike.
+- OOS single frozen shot: +1.30pp CAGR (A8 core) / +1.34pp (A9 core),
+  max DD also better. Same sign in all four IS/OOS × core cells.
+- The funding hurdle exited bonds for all of 2022–2023 (the bond crash)
+  purely out-of-sample — the rule's failure mode was stress-tested by
+  history and passed.
+- Economic rationale is standard: duration carry when it beats funding,
+  plus flight-to-quality convexity in equity crashes (bonds rallied in
+  2008/2020 exactly when the strategy sat in cash).
+
+Caveats: bond leg revalues monthly (intra-month sleeve vol understated —
+second-order since sleeve ≤ cash share); monthly-average yields smooth
+the signal (mitigated by the 1-month lag). Before live use, re-validate
+the sleeve with daily IEF/TLT or daily CMT yields.
+
+Recommendation: **Auto_10** is the new default — it dominates Auto_8 on
+every headline metric with no margin requirement. Auto_10L adds the
+Phase-1 leverage for ~+1.5pp CAGR at slightly worse DD.
+
+Artifacts: `auto10.py`, `gold_sleeve.py` (three-asset engine),
+`data/external/*` (source data), `data/auto_10*_daily_log.csv`.
